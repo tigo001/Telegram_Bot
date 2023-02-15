@@ -7,6 +7,7 @@ namespace Telegram_Bot
 {
     internal class BotEnums
     {
+        #region Enums
         public enum Topics
         {
             HistoryOfArmenia = 0,
@@ -21,6 +22,7 @@ namespace Telegram_Bot
             C = 3,
             D = 4
         }
+        #endregion
 
         public static string[] GetEnumValues(Type enumType)
         {
@@ -34,6 +36,23 @@ namespace Telegram_Bot
             }
 
             return result.ToArray();
+        }
+
+        public static Answers GetAnswers(string answerLetter)
+        {
+            switch(answerLetter)
+            {
+                case "A":
+                    return Answers.A;
+                case "B":
+                    return Answers.B;
+                case "C":
+                    return Answers.C;
+                case"D":
+                    return Answers.D;
+                default:
+                    return Answers.A;
+            }
         }
     }
 }

@@ -28,5 +28,14 @@ namespace Telegram_Bot
 
             return res;
         }
+
+        public static int GetQuestionIndex(string question)
+        {
+            string sub = question.Substring(0, 2);
+            if (sub == "10")
+                return 10;
+            else
+                return Convert.ToInt32(sub.Substring(0, 1));
+        }
     }
 }
