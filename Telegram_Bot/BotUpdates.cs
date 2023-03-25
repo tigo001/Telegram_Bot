@@ -7,15 +7,18 @@ using Telegram.Bot.Types;
 using Telegram.Bot;
 using Telegram_Bot.Models;
 using System.Collections;
+using Telegram.Bot.Types.Enums;
+using System.Linq;
+using static Telegram_Bot.BotEnums;
 
 namespace Telegram_Bot
 {
     internal class BotUpdates
     {
         ITelegramBotClient BotClient { get; set; }
-        static List<QuestionModel> questions;
-        static QuestionModel currentQuestion = null;
-        static int currentScore = 0;
+        static Dictionary<User, List<QuestionModel>> questionsByUsers;
+        static Dictionary<User, QuestionModel> currentQuestionByUsers;
+        static Dictionary<User, int> currentScoreByUsers;
         #region Constructors
         public BotUpdates()
         {
@@ -83,17 +86,17 @@ namespace Telegram_Bot
                 case "Physics":
                     await BotClient.SendTextMessageAsync(chatId: query.Message.Chat.Id, text: "Ok, let's start.");
                     ResetQuiz(query);
-                    await BotClient.SendTextMessageAsync(chatId: query.Message.Chat.Id, text: currentQuestion.Number + ". " + currentQuestion.Question, replyMarkup: KeyboardFunctions.GetAnswers(currentQuestion));
+                    await BotClient.SendTextMessageAsync(chatId: query.Message.Chat.Id, text: currentQuestionByUsers[query.From].Number + ". " + currentQuestionByUsers[query.From].Question, replyMarkup: KeyboardFunctions.GetAnswers(currentQuestionByUsers[query.From]));
                     break;
 
                 default:
-                    if(CheckAnswer(query.Data.Substring(0, 1)))
+                    if(CheckAnswer(query))
                     {
                         await BotClient.SendTextMessageAsync(chatId: query.Message.Chat.Id, text: "You're right.");
-                        currentScore++;
+                        currentScoreByUsers[query.From]++;
                     }
                     else
-                        await BotClient.SendTextMessageAsync(chatId: query.Message.Chat.Id, text: "Right answer is " + GetAnswer(currentQuestion.Answer));
+                        await BotClient.SendTextMessageAsync(chatId: query.Message.Chat.Id, text: "Right answer is " + GetAnswer(currentQuestionByUsers[query.From].Answer));
                     GiveNextQuestion(query);
                     break;
             }
@@ -104,33 +107,41 @@ namespace Telegram_Bot
             int index = Global.GetQuestionIndex(query.Message.Text);
             if (index < 10)
             {
-                currentQuestion = questions[index];
-                await BotClient.SendTextMessageAsync(chatId: query.Message.Chat.Id, text: currentQuestion.Number + ". " + currentQuestion.Question, replyMarkup: KeyboardFunctions.GetAnswers(currentQuestion));
+                currentQuestionByUsers[query.From] = questionsByUsers[query.From][index];
+                await BotClient.SendTextMessageAsync(chatId: query.Message.Chat.Id, text: currentQuestionByUsers[query.From].Number + ". " + currentQuestionByUsers[query.From].Question, replyMarkup: KeyboardFunctions.GetAnswers(currentQuestionByUsers[query.From]));
             }
             else
-                await BotClient.SendTextMessageAsync(chatId: query.Message.Chat.Id, text: $"You passed the quiz. Your score: {currentScore}");
+                await BotClient.SendTextMessageAsync(chatId: query.Message.Chat.Id, text: $"You passed the quiz. Your score: {currentScoreByUsers[query.From]}");
         }
 
         private void ResetQuiz(CallbackQuery query)
         {
-            questions = Global.GetDataFromJson(query.Data.Replace(" ", string.Empty));
-            currentQuestion = questions[0];
-            currentScore = 0;
+            var quest = Global.GetDataFromJson(query.Data.Replace(" ", string.Empty));
+            if (!questionsByUsers.ContainsKey(query.From))
+            {
+                questionsByUsers.Add(query.From, quest);
+                currentQuestionByUsers.Add(query.From, quest[0]);
+                currentScoreByUsers.Add(query.From, 0);
+            }
+            else
+            {
+                questionsByUsers[query.From] = quest;
+                currentQuestionByUsers[query.From] = quest[0];
+                currentScoreByUsers[query.From] = 0;
+            }
         }
 
-        private bool CheckAnswer(string answer)
+        private bool CheckAnswer(CallbackQuery query)
         {
-            if(currentQuestion == null)
+            if (currentQuestionByUsers[query.From] == null)
                 return false;
 
-            int rightAnswer = currentQuestion.Answer;
-            if ((rightAnswer == 1 && answer == "A") ||
-                (rightAnswer == 2 && answer == "B") ||
-                (rightAnswer == 3 && answer == "C") ||
-                (rightAnswer == 4 && answer == "D"))
-                return true;
-
-            return false;
+            int rightAnswer = currentQuestionByUsers[query.From].Answer;
+            string rightAnswerLetter = query.Data.Substring(0, 1);
+            return (rightAnswer == 1 && rightAnswerLetter == "A") ||
+                   (rightAnswer == 2 && rightAnswerLetter == "B") ||
+                   (rightAnswer == 3 && rightAnswerLetter == "C") ||
+                   (rightAnswer == 4 && rightAnswerLetter == "D");
         }
 
         private string GetAnswer(int answer)
